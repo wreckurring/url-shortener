@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shorrty | URL Shortener</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex items-center justify-center p-6">
+
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-8 transform transition-all hover:scale-[1.01]">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-gray-800 mb-2">SHORRTYYY</h1>
+            <p class="text-gray-500 font-medium">Make your long links short and sweet.</p>
+        </header>
+
+        <div class="space-y-4">
+            <div class="relative">
+                <input type="url" id="originalUrl" 
+                    placeholder="Paste your long URL here (e.g. https://google.com)"
+                    class="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 outline-none transition-all text-gray-700">
+            </div>
+
+            <button onclick="shortenUrl()" id="btnText"
+                class="w-full gradient-bg text-white font-bold py-4 rounded-xl hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-purple-200">
+                Shorten Link
+            </button>
+
+            <div id="resultArea" class="hidden mt-8 p-4 bg-purple-50 border border-purple-100 rounded-xl animate-bounce-in">
+                <p class="text-sm text-purple-600 font-semibold mb-2">Your short link is ready:</p>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="shortUrl" readonly
+                        class="w-full bg-white border-none rounded-lg px-3 py-2 text-purple-700 font-bold outline-none">
+                    <button onclick="copyToClipboard()" 
+                        class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+                        Copy
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-8 text-center text-xs text-gray-400">
+            Powered by Distributed Spring Boot & Redis
+        </footer>
+    </div>
+
+    <script>
+        async function shortenUrl() {
+            const urlInput = document.getElementById('originalUrl');
+            const resultArea = document.getElementById('resultArea');
+            const shortUrlInput = document.getElementById('shortUrl');
+            const btnText = document.getElementById('btnText');
+
+            if (!urlInput.value) {
+                alert("Please paste a URL first!");
+                return;
+            }
+
+            btnText.innerText = "Processing...";
+            btnText.disabled = true;
+
+            try {
+                // Call your Spring Boot API
+                const response = await fetch('/shorten', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ originalUrl: urlInput.value })
+                });
+
+                if (response.ok) {
+                    const shortCode = await response.text();
+                    const fullShortUrl = window.location.origin + '/' + shortCode;
+                    
+                    shortUrlInput.value = fullShortUrl;
+                    resultArea.classList.remove('hidden');
+                } else {
+                    alert("Error: Server returned " + response.status);
+                }
+            } catch (error) {
+                console.error("Fetch error:", error);
+                alert("Could not connect to the backend.");
+            } finally {
+                btnText.innerText = "Shorten Link";
+                btnText.disabled = false;
+            }
+        }
+
+        function copyToClipboard() {
+            const copyText = document.getElementById("shortUrl");
+            copyText.select();
+            document.execCommand("copy");
+            alert("Copied to clipboard: " + copyText.value);
+        }
+    </script>
+</body>
+</html>

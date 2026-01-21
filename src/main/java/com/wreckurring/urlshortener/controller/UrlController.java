@@ -18,7 +18,9 @@ public class UrlController {
         return urlService.shortenUrl(request.getOriginalUrl());
     }
 
-    @GetMapping("/{shortCode}")
+    // This Regex [a-zA-Z0-9]+ ensures we only catch alphanumeric short codes.
+    // It will ignore "index.html" (because of the dot) and let Spring serve the static file.
+    @GetMapping("/{shortCode:[a-zA-Z0-9]+}")
     public ResponseEntity<Void> redirectToOriginal(@PathVariable String shortCode) {
         String originalUrl = urlService.getOriginalUrl(shortCode);
         return ResponseEntity.status(HttpStatus.FOUND)
