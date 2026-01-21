@@ -1,0 +1,29 @@
+services:
+  # Database Service
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: url_shortener
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+
+  # Cache Service
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  # Your Application
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      # We use the service names 'postgres' and 'redis' as hostnames
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/url_shortener
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis

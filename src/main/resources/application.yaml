@@ -3,12 +3,22 @@ spring:
     name: url-shortener
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/url_shortener
+    # Uses 'postgres' hostname inside Docker, falls back to 'localhost' for manual testing
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/url_shortener}
     username: postgres
+    # The password is fetched from your terminal environment variable
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+
+  data:
+    redis:
+      # Uses 'redis' hostname inside Docker, falls back to 'localhost' for manual testing
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: 6379
 
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+    # Disables the 'Open Session in View' warning from your logs
+    open-in-view: false
