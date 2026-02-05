@@ -8,6 +8,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -19,8 +21,10 @@ public class UrlService {
 
     @Transactional
     public String shortenUrl(String originalUrl) {
+        String normalizedUrl = normalizeUrl(originalUrl);
+
         UrlMapping mapping = new UrlMapping();
-        mapping.setOriginalUrl(originalUrl);
+        mapping.setOriginalUrl(normalizedUrl);
 
         // 1. Save to PostgreSQL to get the unique ID
         UrlMapping saved = urlRepository.save(mapping);
@@ -33,9 +37,29 @@ public class UrlService {
         urlRepository.save(saved);
 
         // 4. Cache in Redis for 1 hour (Speed Layer)
-        redisTemplate.opsForValue().set(shortCode, originalUrl, 1, TimeUnit.HOURS);
+        redisTemplate.opsForValue().set(shortCode, normalizedUrl, 1, TimeUnit.HOURS);
 
         return shortCode;
+    }
+
+    private String normalizeUrl(String originalUrl) {
+        String normalized = originalUrl == null ? "" : originalUrl.trim();
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException("originalUrl cannot be blank");
+        }
+
+        try {
+            URI uri = new URI(normalized);
+            String scheme = uri.getScheme();
+
+            if (scheme == null || !("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
+                throw new IllegalArgumentException("Only http and https URLs are allowed");
+            }
+
+            return normalized;
+        } catch (URISyntaxException ex) {
+            throw new IllegalArgumentException("Invalid URL format", ex);
+        }
     }
 
     public String getOriginalUrl(String shortCode) {

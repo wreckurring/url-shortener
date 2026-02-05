@@ -1,10 +1,13 @@
 package com.wreckurring.urlshortener.controller;
 
 import com.wreckurring.urlshortener.service.UrlService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 import java.net.URI;
 
 @RestController
@@ -13,9 +16,10 @@ public class UrlController {
 
     private final UrlService urlService;
 
-    @PostMapping(value = "/shorten", consumes = "application/json", produces = "text/plain")
-    public String shorten(@RequestBody ShortenRequest request) {
-        return urlService.shortenUrl(request.getOriginalUrl());
+    @PostMapping(value = "/shorten", consumes = "application/json", produces = "application/json")
+    public ResponseEntity<Map<String, String>> shorten(@Valid @RequestBody ShortenRequest request) {
+        String shortCode = urlService.shortenUrl(request.getOriginalUrl());
+        return ResponseEntity.ok(Map.of("shortCode", shortCode));
     }
 
     // This Regex [a-zA-Z0-9]+ ensures we only catch alphanumeric short codes.
