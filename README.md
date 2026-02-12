@@ -1,55 +1,89 @@
-# Distributed URL Shortener
+# URL Shortener
 
-This is a containerized URL shortening service built with a distributed architecture to ensure scalability and speed. It utilizes a "Read-Aside" caching pattern to minimize database load and provide lightning-fast redirections.
+A distributed URL shortening service designed to explore scalable ID generation, efficient redirection handling, and secure REST API design.
+
+![Java](https://img.shields.io/badge/Java-17-orange.svg) ![Spring
+Boot](https://img.shields.io/badge/Spring%20Boot-3.x-green.svg)
+
+------------------------------------------------------------------------
 
 ## Key Features
 
-* **Modern Interactive UI**: A clean, responsive frontend built with Tailwind CSS.
-* **Distributed Caching**: Uses **Redis** as a speed layer to serve popular links from memory, bypassing the database for frequent requests.
-* **Persistent Storage**: Reliable data management using **PostgreSQL**.
-* **Base62 Encoding**: Custom utility to convert unique database IDs into short, user-friendly strings.
-* **Fully Containerized**: Orchestrated with **Docker Compose** for consistent environment setup across any machine.
+-   **Short Link Generation** - Deterministic and collision-safe short URL
+-   **RESTful API Design** - Clean endpoint structure for create, fetch, and redirect flows
+-   **Persistence Layer** - Reliable storage using relational database indexing
+-   **Scalable Architecture** - Designed for horizontal growth and high read traffic
 
 ## Tech Stack
 
-* **Backend**: Java 17, Spring Boot 3.5.9, Spring Data JPA.
-* **Caching**: Redis.
-* **Database**: PostgreSQL 15.
-* **Frontend**: HTML5, Tailwind CSS, JavaScript.
-* **DevOps**: Docker, Docker Compose.
+| Layer | Technology |
+|-------|-----------|
+| **Backend** | Spring Boot, Java 17 |
+| **Database** | Relational DB (JPA) |
+| **Cache** | Redis 7 |
+| **Build Tool** | Maven |
 
-## Setup and Installation
+## Architecture
 
-### Prerequisites
+    Client → REST Controller → Service Layer → Repository → Database
+                         ↓
+                     Redirect Logic
 
-* Docker Desktop installed and running.
-* Java 17 and Maven (or use the included `mvnw` wrapper).
+## Key Challenges Solved
 
-### 1. Build the Application
+-   Designed constant-time lookup for high-speed redirection.
+-   Ensured database indexing for efficient large-scale reads.
+-   Handled browser requests separately
 
-Package the Spring Boot application into an executable JAR file:
+## Scalability Design
 
-```powershell
-.\mvnw clean package -DskipTests
+-   Read-heavy optimization for fast redirect performance.
+-   Stateless backend enabling horizontal scaling.
+-   Database indexing on short codes for O(log n) retrieval.
+-   Clean separation of concerns for future caching layer integration.
 
+## Security
+
+-   Input validation on URL creation requests.
+-   Structured exception handling for safe API responses.
+
+## Project Structure
+
+    url-shortener/
+    ├── src/main/java/
+    │   ├── controller/      # REST endpoints
+    │   ├── service/         # Business logic
+    │   ├── repository/      # Data access layer
+    │   ├── model/           # Entity definitions
+    │   └── dto/             # Request/response objects
+    ├── pom.xml              # Maven configuration
+    └── README.md
+
+## Quick Start
+
+``` bash
+git clone https://github.com/wreckurring/url-shortener.git
+cd url-shortener
+mvn spring-boot:run
 ```
 
-### 2. Launch with Docker Compose
+Server runs at:
 
-Run the entire distributed system (App, Postgres, and Redis) with a single command. Replace `your_password` with your desired database password:
+    http://localhost:9090
 
-```powershell
-$env:DB_PASSWORD='your_password'; docker-compose up --build
+## Future Improvements
 
-```
+-   **Analytics** -- Click tracking and usage statistics
+-   **Custom Aliases** -- User-defined short URLs
+-   **Rate Limiting** -- Abuse prevention for public APIs
+-   **Distributed ID Generation** -- Snowflake ULID-based scaling
 
-### 3. Access the Service
+## Testing
 
-* **Frontend**: Open [http://localhost:8080](https://www.google.com/search?q=http://localhost:8080) to use the interactive dashboard.
-* **API**: You can also shorten URLs via POST requests to `/shorten`.
+-   Unit tests for service logic
+-   Integration tests for API endpoints
+-   Edge case testing for invalid/expired URLs
 
-## 📂 Project Structure
+## License
 
-* `src/main/java/.../service/UrlService.java`: Logic for coordinating between the DB and Redis cache.
-* `src/main/resources/static/index.html`: The interactive ZipLink web interface.
-* `docker-compose.yml`: Defines the multi-container environment for the distributed system.
+MIT License
