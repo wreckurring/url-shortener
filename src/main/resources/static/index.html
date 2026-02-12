@@ -65,18 +65,15 @@
             btnText.disabled = true;
 
             try {
-                // Call your Spring Boot API
-                const response = await fetch('/shorten', {
+                const response = await fetch('/api/v1/shorten', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ originalUrl: urlInput.value })
+                    body: JSON.stringify({ url: urlInput.value })
                 });
 
                 if (response.ok) {
-                    const shortCode = await response.text();
-                    const fullShortUrl = window.location.origin + '/' + shortCode;
-                    
-                    shortUrlInput.value = fullShortUrl;
+                    const data = await response.json();
+                    shortUrlInput.value = data.shortUrl; 
                     resultArea.classList.remove('hidden');
                 } else {
                     alert("Error: Server returned " + response.status);

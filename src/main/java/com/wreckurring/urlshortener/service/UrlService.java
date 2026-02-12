@@ -1,60 +1,138 @@
 package com.wreckurring.urlshortener.service;
 
-import com.wreckurring.urlshortener.model.UrlMapping;
+import com.wreckurring.urlshortener.model.Url;
+import com.wreckurring.urlshortener.model.UrlClick;
+import com.wreckurring.urlshortener.repository.UrlClickRepository;
 import com.wreckurring.urlshortener.repository.UrlRepository;
-import com.wreckurring.urlshortener.util.Base62Encoder;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import com.wreckurring.urlshortener.util.ShortCodeGenerator;
+import eu.bitwalker.useragentutils.UserAgent;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
+import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 public class UrlService {
 
-    private final UrlRepository urlRepository;
-    private final StringRedisTemplate redisTemplate; // Built-in tool to talk to Redis
+    @Autowired
+    private UrlRepository urlRepository;
+    
+    @Autowired
+    private UrlClickRepository urlClickRepository;
+
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
+    private static final String REDIS_KEY_PREFIX = "url:";
+    private static final Duration CACHE_TTL = Duration.ofHours(24);
+    private static final int MAX_COLLISION_ATTEMPTS = 5;
 
     @Transactional
     public String shortenUrl(String originalUrl) {
-        UrlMapping mapping = new UrlMapping();
-        mapping.setOriginalUrl(originalUrl);
+        // Check if URL already exists
+        Optional<Url> existingUrl = urlRepository.findByOriginalUrl(originalUrl);
+        if (existingUrl.isPresent()) {
+            return existingUrl.get().getShortCode();
+        }
 
-        // 1. Save to PostgreSQL to get the unique ID
-        UrlMapping saved = urlRepository.save(mapping);
+        // Generate unique short code with collision handling
+        String shortCode = generateUniqueShortCode(originalUrl);
+        
+        // Save to database
+        Url url = new Url(originalUrl, shortCode);
+        urlRepository.save(url);
 
-        // 2. Generate the short code
-        String shortCode = Base62Encoder.encode(saved.getId());
-        saved.setShortCode(shortCode);
-
-        // 3. Update PostgreSQL with the short code
-        urlRepository.save(saved);
-
-        // 4. Cache in Redis for 1 hour (Speed Layer)
-        redisTemplate.opsForValue().set(shortCode, originalUrl, 1, TimeUnit.HOURS);
+        // Cache in Redis
+        redisTemplate.opsForValue().set(
+            REDIS_KEY_PREFIX + shortCode, 
+            originalUrl, 
+            CACHE_TTL
+        );
 
         return shortCode;
     }
 
-    public String getOriginalUrl(String shortCode) {
-        // 1. Check Redis (Fast Look-up)
-        String cachedUrl = redisTemplate.opsForValue().get(shortCode);
+    @Transactional
+    public String getOriginalUrl(String shortCode, String ipAddress, String userAgent, String referer) {
+        // Try Redis cache first
+        String cachedUrl = redisTemplate.opsForValue().get(REDIS_KEY_PREFIX + shortCode);
+        
         if (cachedUrl != null) {
-            System.out.println("Cache Hit! Found in Redis.");
+            // Still need to track analytics even if cached
+            trackClick(shortCode, ipAddress, userAgent, referer);
             return cachedUrl;
         }
 
-        // 2. If not in Redis, check PostgreSQL (Slow Look-up)
-        System.out.println("Cache Miss! Looking in PostgreSQL.");
-        String originalUrl = urlRepository.findByShortCode(shortCode)
-                .map(UrlMapping::getOriginalUrl)
-                .orElseThrow(() -> new RuntimeException("URL not found for: " + shortCode));
+        // Fallback to database
+        Optional<Url> urlOptional = urlRepository.findByShortCode(shortCode);
+        
+        if (urlOptional.isPresent()) {
+            Url url = urlOptional.get();
+            
+            // Track the click
+            trackClick(shortCode, ipAddress, userAgent, referer);
+            
+            // Update cache
+            redisTemplate.opsForValue().set(
+                REDIS_KEY_PREFIX + shortCode, 
+                url.getOriginalUrl(), 
+                CACHE_TTL
+            );
+            
+            return url.getOriginalUrl();
+        }
 
-        // 3. Warm up the cache: Put it back in Redis so it's fast next time
-        redisTemplate.opsForValue().set(shortCode, originalUrl, 1, TimeUnit.HOURS);
+        return null;
+    }
 
-        return originalUrl;
+    private String generateUniqueShortCode(String originalUrl) {
+        for (int attempt = 0; attempt < MAX_COLLISION_ATTEMPTS; attempt++) {
+            String shortCode = ShortCodeGenerator.generateFromUrl(originalUrl + attempt);
+            
+            if (!urlRepository.existsByShortCode(shortCode)) {
+                return shortCode;
+            }
+        }
+        
+        // If all attempts fail, use pure random
+        String randomCode;
+        do {
+            randomCode = ShortCodeGenerator.generateRandom();
+        } while (urlRepository.existsByShortCode(randomCode));
+        
+        return randomCode;
+    }
+
+    private void trackClick(String shortCode, String ipAddress, String userAgent, String referer) {
+        Optional<Url> urlOptional = urlRepository.findByShortCode(shortCode);
+        
+        if (urlOptional.isPresent()) {
+            Url url = urlOptional.get();
+            
+            // Increment click count
+            url.incrementClickCount();
+            urlRepository.save(url);
+            
+            // Parse user agent
+            UserAgent ua = UserAgent.parseUserAgentString(userAgent);
+            
+            // Create click record
+            UrlClick click = new UrlClick(url, ipAddress, userAgent, referer);
+            click.setDeviceType(ua.getOperatingSystem().getDeviceType().getName());
+            click.setBrowser(ua.getBrowser().getName());
+            click.setCountry(getCountryFromIp(ipAddress)); // Will implement this
+            
+            urlClickRepository.save(click);
+        }
+    }
+
+    private String getCountryFromIp(String ipAddress) {
+        if (ipAddress == null || ipAddress.equals("0:0:0:0:0:0:0:1") || ipAddress.equals("127.0.0.1")) {
+            return "Local";
+        }
+        return "Unknown";
     }
 }
