@@ -1,6 +1,6 @@
 # URL Shortener
 
-A distributed URL shortening service designed to explore scalable ID generation, efficient redirection handling, and secure REST API design.
+A distributed URL shortening service designed to explore scalable ID generation, efficient redirection handling, and REST API design.
 
 ![Java](https://img.shields.io/badge/Java-17-orange.svg) ![Spring
 Boot](https://img.shields.io/badge/Spring%20Boot-3.x-green.svg)
