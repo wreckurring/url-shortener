@@ -73,16 +73,11 @@ Server runs at:
 
 ## Future Improvements
 
+-   **Tests** -- Add unit tests
 -   **Analytics** -- Click tracking and usage statistics
 -   **Custom Aliases** -- User-defined short URLs
 -   **Rate Limiting** -- Abuse prevention for public APIs
 -   **Distributed ID Generation** -- Snowflake ULID-based scaling
-
-## Testing
-
--   Unit tests for service logic
--   Integration tests for API endpoints
--   Edge case testing for invalid/expired URLs
 
 ## License
 
