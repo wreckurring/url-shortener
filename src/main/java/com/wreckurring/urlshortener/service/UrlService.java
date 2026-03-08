@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Duration;
 import java.util.Optional;
 
@@ -15,12 +16,13 @@ import java.util.Optional;
 public class UrlService {
     @Autowired private UrlRepository urlRepository;
     @Autowired private RedisTemplate<String, String> redisTemplate;
-    @Autowired private BloomFilterService bloomFilterService;
     @Autowired private TokenRangeService tokenRangeService;
     @Autowired private AnalyticsProducer analyticsProducer;
 
     private static final String REDIS_KEY_PREFIX = "url:";
+    private static final String REDIS_NULL_VALUE = "NOT_FOUND"; // Used for Negative Caching
     private static final Duration CACHE_TTL = Duration.ofDays(7);
+    private static final Duration NULL_CACHE_TTL = Duration.ofMinutes(5);
 
     @Transactional
     public String shortenUrl(String originalUrl) {
@@ -35,20 +37,21 @@ public class UrlService {
         Url url = new Url(originalUrl, shortCode);
         urlRepository.save(url);
 
-        // add to bloom filter & redis cache
-        bloomFilterService.add(shortCode);
+        // add to redis cache
         redisTemplate.opsForValue().set(REDIS_KEY_PREFIX + shortCode, originalUrl, CACHE_TTL);
 
         return shortCode;
     }
 
     public String getOriginalUrl(String shortCode, String ipAddress, String userAgent, String referer) {
-        // bloom filter check
-        if (!bloomFilterService.mightContain(shortCode)) return null;
-
-        // try redis cache first
         String cachedUrl = redisTemplate.opsForValue().get(REDIS_KEY_PREFIX + shortCode);
 
+        // negative cache hit
+        if (REDIS_NULL_VALUE.equals(cachedUrl)) {
+            return null;
+        }
+
+        // positive cache hit
         if (cachedUrl != null) {
             fireAnalyticsEvent(shortCode, ipAddress, userAgent, referer);
             return cachedUrl;
@@ -63,6 +66,8 @@ public class UrlService {
             return url.getOriginalUrl();
         }
 
+        // negative caching
+        redisTemplate.opsForValue().set(REDIS_KEY_PREFIX + shortCode, REDIS_NULL_VALUE, NULL_CACHE_TTL);
         return null;
     }
 

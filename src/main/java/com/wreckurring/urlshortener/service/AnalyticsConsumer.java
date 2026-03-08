@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Optional;
 
 @Service
@@ -20,11 +21,11 @@ public class AnalyticsConsumer {
     @KafkaListener(topics = "url-clicks", groupId = "analytics-group")
     @Transactional
     public void consume(ClickEvent event) {
+        urlRepository.incrementClickCount(event.getShortCode());
+
         Optional<Url> urlOptional = urlRepository.findByShortCode(event.getShortCode());
         if (urlOptional.isPresent()) {
             Url url = urlOptional.get();
-            url.incrementClickCount();
-            urlRepository.save(url);
 
             UserAgent ua = UserAgent.parseUserAgentString(event.getUserAgent());
             UrlClick click = new UrlClick(url, event.getIpAddress(), event.getUserAgent(), event.getReferer());
