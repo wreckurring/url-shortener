@@ -4,6 +4,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
+
 @Service
 public class TokenRangeService {
     @Autowired
@@ -12,20 +15,34 @@ public class TokenRangeService {
     private static final String ID_COUNTER_KEY = "url:token:allocator";
     private static final long RANGE_STEP = 1000;
     
-    private long currentId = 0;
-    private long maxId = 0;
+    private final AtomicLong currentId = new AtomicLong(0);
+    private volatile long maxId = 0;
+    private final ReentrantLock lock = new ReentrantLock();
 
-    public synchronized long getNextId() {
-        if (currentId >= maxId) {
-            allocateNewRange();
+    public long getNextId() {
+        long id = currentId.getAndIncrement();
+        if (id < maxId) {
+            return id;
         }
-        return currentId++;
+        
+        // only lock when we need to fetch a new range from redis
+        lock.lock();
+        try {
+            id = currentId.getAndIncrement();
+            if (id < maxId) {
+                return id;
+            }
+            allocateNewRange();
+            return currentId.getAndIncrement();
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void allocateNewRange() {
         Long nextMax = redisTemplate.opsForValue().increment(ID_COUNTER_KEY, RANGE_STEP);
         if (nextMax == null) throw new RuntimeException("Redis unavailable for Token Allocation");
         this.maxId = nextMax;
-        this.currentId = maxId - RANGE_STEP + 1;
+        this.currentId.set(maxId - RANGE_STEP + 1);
     }
 }
