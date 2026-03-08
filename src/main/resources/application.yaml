@@ -22,3 +22,13 @@ spring:
     show-sql: true
     # Disables the 'Open Session in View' warning from your logs
     open-in-view: false
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: analytics-group
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
