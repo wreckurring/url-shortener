@@ -25,7 +25,6 @@ class UrlServiceTest {
     @Mock private UrlRepository urlRepository;
     @Mock private RedisTemplate<String, String> redisTemplate;
     @Mock private ValueOperations<String, String> valueOperations;
-    @Mock private BloomFilterService bloomFilterService;
     @Mock private TokenRangeService tokenRangeService;
     @Mock private AnalyticsProducer analyticsProducer;
 
@@ -57,30 +56,27 @@ class UrlServiceTest {
 
         assertEquals("g8", shortCode);
         verify(urlRepository).save(any(Url.class));
-        verify(bloomFilterService).add("g8");
         verify(valueOperations).set(eq("url:g8"), eq("https://newsite.com"), any());
     }
 
     @Test
-    void getOriginalUrl_WhenBloomFilterMisses_ReturnsNullImmediately() {
-        when(bloomFilterService.mightContain("invalidCode")).thenReturn(false);
+    void getOriginalUrl_WhenNegativeCacheHits_ReturnsNullImmediately() {
+        when(valueOperations.get("url:invalidCode")).thenReturn("NOT_FOUND");
 
         String result = urlService.getOriginalUrl("invalidCode", "127.0.0.1", "Agent", "Ref");
 
         assertNull(result);
-        verify(redisTemplate, never()).opsForValue();
         verify(urlRepository, never()).findByShortCode(anyString());
     }
 
     @Test
     void getOriginalUrl_WhenRedisHits_ReturnsUrlAndFiresAnalytics() {
-        when(bloomFilterService.mightContain("validCode")).thenReturn(true);
         when(valueOperations.get("url:validCode")).thenReturn("https://cached.com");
 
         String result = urlService.getOriginalUrl("validCode", "127.0.0.1", "Agent", "Ref");
 
         assertEquals("https://cached.com", result);
         verify(urlRepository, never()).findByShortCode(anyString());
-        verify(analyticsProducer).sendClickEvent(any()); // Ensures async analytics fired
+        verify(analyticsProducer).sendClickEvent(any()); 
     }
 }

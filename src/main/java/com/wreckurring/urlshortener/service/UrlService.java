@@ -29,15 +29,12 @@ public class UrlService {
         Optional<Url> existingUrl = urlRepository.findByOriginalUrl(originalUrl);
         if (existingUrl.isPresent()) return existingUrl.get().getShortCode();
 
-        // generate short code
         long uniqueId = tokenRangeService.getNextId();
         String shortCode = ShortCodeGenerator.encodeBase62(uniqueId);
 
-        // save to database
         Url url = new Url(originalUrl, shortCode);
         urlRepository.save(url);
 
-        // add to redis cache
         redisTemplate.opsForValue().set(REDIS_KEY_PREFIX + shortCode, originalUrl, CACHE_TTL);
 
         return shortCode;
@@ -57,7 +54,6 @@ public class UrlService {
             return cachedUrl;
         }
 
-        // fallback to database
         Optional<Url> urlOptional = urlRepository.findByShortCode(shortCode);
         if (urlOptional.isPresent()) {
             Url url = urlOptional.get();

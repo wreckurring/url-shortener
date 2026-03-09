@@ -11,6 +11,9 @@ import org.springframework.web.servlet.view.RedirectView;
 import java.util.HashMap;
 import java.util.Map;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+
 @RestController
 public class UrlController {
 
@@ -23,6 +26,15 @@ public class UrlController {
         
         if (originalUrl == null || originalUrl.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "URL is required"));
+        }
+
+        try {
+            URI uri = new URI(originalUrl);
+            if (uri.getScheme() == null || uri.getHost() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid URL format. Must include http:// or https://"));
+            }
+        } catch (URISyntaxException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid URL format"));
         }
 
         try {
